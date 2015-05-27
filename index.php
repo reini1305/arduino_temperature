@@ -1,7 +1,3 @@
-<?php
-	$_SESSION['navigation']='research';
-	include("../../head.php");
-?>
 <!-- BEGIN Site Content -->
 
 
@@ -278,7 +274,7 @@ echo "  -1 " . $year . "-" . $month . "-" . $day . " " . $hour . ":" . $minute .
         labels: [<?php for($i = 0; $i < count($labels); $i++) { if ($i > 0) { echo ','; } echo "'$labels[$i]'"; } ?>],
         datasets: [
             {
-                label: "LRS Office Temperature",
+                label: "Mobile Vision Lab Temperature",
                 fillColor: "rgba(220,50,50,0.2)",
                 strokeColor: "rgba(220,50,50,1)",
                 pointColor: "rgba(220,50,50,1)",
@@ -317,7 +313,7 @@ echo "  -1 " . $year . "-" . $month . "-" . $day . " " . $hour . ":" . $minute .
       labels: [<?php for($i = 0; $i < count($wlbl); $i++) { if ($i > 0) { echo ','; } echo "'$wlbl[$i]'"; } ?>],
       datasets: [
           {
-              label: "Maximum Office Temperature",
+              label: "Maximum Lab Temperature",
               fillColor: "rgba(220,50,50,0.2)",
               strokeColor: "rgba(220,50,50,1)",
               pointColor: "rgba(220,50,50,1)",
@@ -328,7 +324,7 @@ echo "  -1 " . $year . "-" . $month . "-" . $day . " " . $hour . ":" . $minute .
               data: [<?php for($i = 0; $i < count($wmax); $i++) { if ($i > 0) { echo ', '; } printf("'%.1f'", $wmax[$i]); } ?>]
           },
           {
-              label: "Mean Office Temperature",
+              label: "Mean Lab Temperature",
               fillColor: "rgba(255,100,50,0.2)",
               strokeColor: "rgba(255,100,50,1)",
               pointColor: "rgba(255,100,50,1)",
@@ -339,7 +335,7 @@ echo "  -1 " . $year . "-" . $month . "-" . $day . " " . $hour . ":" . $minute .
               data: [<?php for($i = 0; $i < count($wmean); $i++) { if ($i > 0) { echo ', '; } printf("'%.1f'", $wmean[$i]); } ?>]
           },
           {
-              label: "Minimum Office Temperature",
+              label: "Minimum Lab Temperature",
               fillColor: "rgba(30,30,205,.2)",
               strokeColor: "rgba(30,30,205,1)",
               pointColor: "rgba(30,30,205,1)",
@@ -378,5 +374,3 @@ echo "  -1 " . $year . "-" . $month . "-" . $day . " " . $hour . ":" . $minute .
 }
 ?>
 
-<!-- END Site Content -->
-<?php include("../../footer.php"); ?>

@@ -39,12 +39,12 @@ byte pm[8] = {
 
 byte circle[8] = {
   B00000,
-  B00000,
-  B01110,
+  B01010,
   B11111,
   B11111,
+  B11111,
   B01110,
-  B00000,
+  B00100,
 };
 
 // function to print a device address
@@ -99,6 +99,17 @@ void refreshDisplay(void)
   calcMeanTemperature();
   lcd.setCursor(15, 1);
   lcd.print(" ");
+  lcd.setCursor(0,0);
+  if(curr_mean_temp>35.0f)
+  {
+    lcd.print("Time to go home!");
+  }
+  else
+  {
+    lcd.print("Temp.(");
+    lcd.print(num_sensors);
+    lcd.print(" sensors)");
+  }
   lcd.setCursor(0, 1);
   lcd.print(curr_mean_temp);
   lcd.print((char)0xDF);

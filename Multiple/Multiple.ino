@@ -23,9 +23,16 @@ int8_t num_sensors;
 
 float curr_mean_temp;
 float curr_std_temp;
+float min_temp;
+float max_temp;
+bool show_current;
 
 // initialize the library with the numbers of the interface pins
 LiquidCrystal lcd(9, 8, 13, 12, 11, 10);
+#define PM         0
+#define HEART      1
+#define ARROW_UP   2
+#define ARROW_DOWN 3
 
 byte pm[8] = {
   B00100,
@@ -37,12 +44,32 @@ byte pm[8] = {
   B11111,
 };
 
-byte circle[8] = {
+byte heart[8] = {
   B00000,
   B01010,
   B11111,
   B11111,
   B11111,
+  B01110,
+  B00100,
+};
+
+byte arrow_up[8] = {
+  B00100,
+  B01110,
+  B10101,
+  B00100,
+  B00100,
+  B00100,
+  B00100,
+};
+
+byte arrow_down[8] = {
+  B00100,
+  B00100,
+  B00100,
+  B00100,
+  B10101,
   B01110,
   B00100,
 };
@@ -94,7 +121,7 @@ void printMeanTemperature(void)
 void refreshDisplay(void)
 {
   lcd.setCursor(15, 1);
-  lcd.write((byte)1);
+  lcd.write((byte)HEART);
   sensors.requestTemperatures();
   calcMeanTemperature();
   lcd.setCursor(15, 1);
@@ -111,12 +138,26 @@ void refreshDisplay(void)
     lcd.print(" sensors)");
   }
   lcd.setCursor(0, 1);
-  lcd.print(curr_mean_temp);
-  lcd.print((char)0xDF);
-  lcd.print("C ");
-  lcd.write((byte)0);
-  lcd.print(" ");
-  lcd.print(curr_std_temp);
+  if(show_current)
+  {
+    lcd.print(curr_mean_temp);
+    lcd.print((char)0xDF);
+    lcd.print("C ");
+    lcd.write((byte)PM);
+    lcd.print(" ");
+    lcd.print(curr_std_temp);
+  }
+  else
+  {
+    lcd.write((byte)ARROW_DOWN);
+    lcd.print(min_temp);
+    lcd.print((char)0xDF);
+    lcd.print(" ");
+    lcd.write((byte)ARROW_UP);
+    lcd.print(max_temp);
+    lcd.print((char)0xDF);
+  }
+  show_current=!show_current;
 }
 
 void setup(void)
@@ -157,15 +198,19 @@ void setup(void)
     // set the resolution to 12 bit
     sensors.setResolution(thermometer[i], TEMPERATURE_PRECISION);
   }
-
+  show_current = true;
+  max_temp = -1000;
+  min_temp = 1000;
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
   // Print a message to the LCD.
   lcd.print("Temp.(");
   lcd.print(num_sensors);
   lcd.print(" sensors)");
-  lcd.createChar(0,pm);
-  lcd.createChar(1,circle);
+  lcd.createChar(PM,pm);
+  lcd.createChar(HEART,heart);
+  lcd.createChar(ARROW_UP,arrow_up);
+  lcd.createChar(ARROW_DOWN, arrow_down);
   Timer1.initialize(8800000);
   Timer1.attachInterrupt(refreshDisplay);
 }

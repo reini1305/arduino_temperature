@@ -108,6 +108,13 @@ void calcMeanTemperature(void)
   }
   curr_std_temp/=num_sensors;
   curr_std_temp = sqrt(curr_std_temp);
+  if(curr_std_temp<0.2)
+  {
+    if(min_temp>curr_mean_temp)
+      min_temp = curr_mean_temp;
+    if(max_temp<curr_mean_temp)
+      max_temp = curr_mean_temp;
+  }
 }
 
 void printMeanTemperature(void)

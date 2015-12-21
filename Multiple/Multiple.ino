@@ -21,6 +21,7 @@ DeviceAddress thermometer[MAX_SENSORS];
 
 int8_t num_sensors;
 
+float cal_temp = -0.5f;
 float curr_mean_temp;
 float curr_std_temp;
 float min_temp;
@@ -98,7 +99,7 @@ void printAddress(DeviceAddress deviceAddress)
 // function to print the temperature for a device
 void printTemperature(DeviceAddress deviceAddress)
 {
-  float tempC = sensors.getTempC(deviceAddress);
+  float tempC = sensors.getTempC(deviceAddress)+cal_temp;
   Serial.print("Temp C: ");
   Serial.println(tempC);
 }
@@ -116,6 +117,7 @@ void calcMeanTemperature(void)
   {
     curr_std_temp += (sensors.getTempC(thermometer[i]) - curr_mean_temp) * (sensors.getTempC(thermometer[i]) - curr_mean_temp);
   }
+  curr_mean_temp+=cal_temp;
   curr_std_temp/=num_sensors;
   curr_std_temp = sqrt(curr_std_temp);
   if(curr_std_temp<0.2)

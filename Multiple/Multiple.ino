@@ -1,7 +1,7 @@
 #include <TimerOne.h>
 
 #include <LiquidCrystal.h>
-
+#include <EEPROM.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
@@ -9,6 +9,7 @@
 #define ONE_WIRE_BUS 7
 #define TEMPERATURE_PRECISION 12
 #define MAX_SENSORS 5
+#define EEPROM_RESET 450
 
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_BUS);
@@ -21,11 +22,13 @@ DeviceAddress thermometer[MAX_SENSORS];
 
 int8_t num_sensors;
 
-float cal_temp = -0.5f;
+float cal_temp = -1.4f;
 float curr_mean_temp;
 float curr_std_temp;
 float min_temp;
 float max_temp;
+
+int eeprom_counter=EEPROM_RESET; // one update per hour
 
 // initialize the library with the numbers of the interface pins
 LiquidCrystal lcd(9, 8, 13, 12, 11, 10);
@@ -139,6 +142,12 @@ void printMeanTemperature(void)
 
 void refreshDisplay(void)
 {
+  // handle EEPROM first
+  if(--eeprom_counter<=0) {
+    EEPROM.put(0,min_temp);
+    EEPROM.put(sizeof(float),max_temp);
+    eeprom_counter=EEPROM_RESET;
+  }
   lcd.setCursor(15, 1);
   lcd.write((byte)HEART);
   sensors.requestTemperatures();
@@ -197,8 +206,10 @@ void setup(void)
     // set the resolution to 12 bit
     sensors.setResolution(thermometer[i], TEMPERATURE_PRECISION);
   }
-  max_temp = -1000;
-  min_temp = 1000;
+  //max_temp = -1000;
+  //min_temp = 1000;
+  EEPROM.get(0,min_temp);
+  EEPROM.get(sizeof(float),max_temp);
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
   // Print a message to the LCD.

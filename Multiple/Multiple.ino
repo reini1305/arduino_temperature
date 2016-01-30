@@ -238,10 +238,13 @@ void loop(void)
     sensors.requestTemperatures();
     if(incomingByte == 'r')
     {
-      for (uint8_t i = 0; i < num_sensors; i++)
-      {
-        printTemperature(thermometer[i]);
-      }
+      // reset min, max temperature
+      max_temp = -1000;
+      min_temp = 1000;
+      calcMeanTemperature();
+      EEPROM.put(0,min_temp);
+      EEPROM.put(sizeof(float),max_temp);
+      eeprom_counter=EEPROM_RESET;
     }
     else
     {

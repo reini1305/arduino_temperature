@@ -12,8 +12,8 @@
 #define TEMPERATURE_PRECISION 12
 #define MAX_SENSORS 5
 #define EEPROM_RESET 450
-#define HISTORY_RESET 1
-#define SIZE_HISTORY 100
+#define HISTORY_RESET 10
+#define SIZE_HISTORY 110
 
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_BUS);
@@ -36,30 +36,12 @@ unsigned int curr_idx=0;
 unsigned int history_counter=HISTORY_RESET;
 
 int eeprom_counter=EEPROM_RESET; // one update per hour
+
 gText textTemp = gText(0,0,GLCD.Right-10,GLCD.Bottom);
 gText textMax = gText(0,0,GLCD.Right-10,18);
-gText textMin = gText(0,GLCD.Bottom-10,GLCD.Right-10,GLCD.Bottom);
-char temp_buffer[10],max_buffer[10],min_buffer[10];
+gText textMin = gText(0,GLCD.Bottom-18,GLCD.Right-10,GLCD.Bottom);
+char temp_buffer[10];
 bool draw_temp = true;
-
-// function to print a device address
-void printAddress(DeviceAddress deviceAddress)
-{
-  for (uint8_t i = 0; i < 8; i++)
-  {
-    // zero pad the address if necessary
-    if (deviceAddress[i] < 16) Serial.print("0");
-    Serial.print(deviceAddress[i], HEX);
-  }
-}
-
-// function to print the temperature for a device
-void printTemperature(DeviceAddress deviceAddress)
-{
-  float tempC = sensors.getTempC(deviceAddress)+cal_temp;
-  Serial.print("Temp C: ");
-  Serial.println(tempC);
-}
 
 void calcMeanTemperature(void)
 {
@@ -116,7 +98,7 @@ void refreshDisplay(void)
 {
   refreshEEPROM();
   sensors.requestTemperatures();
-  //calcMeanTemperature();
+  calcMeanTemperature();
   updateTemperatureHistory();
 
   GLCD.ClearScreen();
@@ -127,31 +109,29 @@ void refreshDisplay(void)
   GLCD.DrawLine(128-9,6,128-9,64-10);
   GLCD.DrawLine(128-3,6,128-3,64-10);
 
-  // Fake temperatures for now
-  min_temp = 18.0;
-  max_temp = 27.0;
-  curr_mean_temp = random(18, 27);
   GLCD.DrawVBarGraph(GLCD.Right-6, GLCD.Bottom-6, 3, -(GLCD.Height-10), 0, min_temp*10, max_temp*10, curr_mean_temp*10);
 
  if(draw_temp) {
     // Update min/max values
     sprintf(temp_buffer,"%d.%d C",(int)curr_mean_temp,(int)(curr_mean_temp*10.f)-((int)curr_mean_temp)*10);
     textTemp.DrawString(temp_buffer,gTextfmt_center, gTextfmt_center);
-    sprintf(max_buffer,"%d.%d C",(int)max_temp,(int)(max_temp*10.f)-((int)max_temp)*10);
-    textMax.DrawString(max_buffer,gTextfmt_center, gTextfmt_center);
-    sprintf(min_buffer,"%d.%d C",(int)min_temp,(int)(min_temp*10.f)-((int)min_temp)*10);
-    textMin.DrawString(min_buffer,gTextfmt_center, gTextfmt_center);
+    sprintf(temp_buffer,"%d.%d C",(int)max_temp,(int)(max_temp*10.f)-((int)max_temp)*10);
+    textMax.DrawString(temp_buffer,gTextfmt_center, gTextfmt_center);
+    sprintf(temp_buffer,"%d.%d C",(int)min_temp,(int)(min_temp*10.f)-((int)min_temp)*10);
+    textMin.DrawString(temp_buffer,gTextfmt_center, gTextfmt_center);
+    draw_temp=false;
  } else {
    // draw the history
+   GLCD.DrawRect(0,0,SIZE_HISTORY,GLCD.Bottom+1);
    for (int i=1;i<SIZE_HISTORY;i++) {
     if(temp_history[(curr_idx+i)%SIZE_HISTORY]>0) {
       int y=(temp_history[(curr_idx+i)%SIZE_HISTORY]-min_temp)/((max_temp-min_temp)/64);
+      //GLCD.SetDot(i,GLCD.Bottom-y,PIXEL_ON);
       GLCD.DrawLine(i,GLCD.Bottom,i,GLCD.Bottom-y);
     }
    }
+   draw_temp=true;
  }
-
-  draw_temp=!draw_temp;
 }
 
 void setup(void)
@@ -193,7 +173,6 @@ void setup(void)
   textTemp.SelectFont(Cooper26);
   textMin.SelectFont(Cooper19);
   textMax.SelectFont(Cooper19);
-  randomSeed(analogRead(5));
   
   Timer1.initialize(8800000);
   Timer1.attachInterrupt(refreshDisplay);

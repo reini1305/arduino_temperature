@@ -1,12 +1,10 @@
 #include <openGLCD.h>
-
 #include <TimerOne.h>
-
 #include <EEPROM.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-// Data wire is plugged into port 8 on the Arduino
+// Data wire is plugged into pin 10 on the Arduino
 #define ONE_WIRE_BUS 10
 
 #define TEMPERATURE_PRECISION 12
@@ -26,7 +24,7 @@ DeviceAddress thermometer[MAX_SENSORS];
 
 int8_t num_sensors;
 
-float cal_temp = -1.4f;
+float cal_temp = -0.5f;
 float curr_mean_temp;
 float curr_std_temp;
 float min_temp;
@@ -40,6 +38,7 @@ int eeprom_counter=EEPROM_RESET; // one update per hour
 gText textTemp = gText(0,0,GLCD.Right-10,GLCD.Bottom);
 gText textMax = gText(0,0,GLCD.Right-10,18);
 gText textMin = gText(0,GLCD.Bottom-18,GLCD.Right-10,GLCD.Bottom);
+
 char temp_buffer[10];
 bool draw_temp = true;
 
@@ -88,10 +87,17 @@ void refreshEEPROM(void)
 void updateTemperatureHistory(void)
 {
   if(--history_counter==0) {
-    temp_history[curr_idx] = curr_mean_temp;
-    curr_idx = (curr_idx + 1) % SIZE_HISTORY;
+    if(curr_std_temp<0.2) {
+      temp_history[curr_idx] = curr_mean_temp;
+      curr_idx = (curr_idx + 1) % SIZE_HISTORY;
+    }
     history_counter=HISTORY_RESET;
   }
+}
+
+void convertTemperatureToString(char* tempbuffer, float temperature)
+{
+  sprintf(tempbuffer,"%d.%d C",(int)temperature,(int)(temperature*10.f)-((int)temperature)*10);
 }
 
 void refreshDisplay(void)
@@ -100,24 +106,25 @@ void refreshDisplay(void)
   sensors.requestTemperatures();
   calcMeanTemperature();
   updateTemperatureHistory();
+  float disp_temp = constrain(curr_mean_temp,min_temp,max_temp);
 
   GLCD.ClearScreen();
+  
   // Draw thermometer
   GLCD.DrawCircle(128-6,64-6,5);
   GLCD.DrawCircle(128-6,4,3);
   GLCD.FillRect(128-8,6,5,64-10,PIXEL_OFF);
   GLCD.DrawLine(128-9,6,128-9,64-10);
   GLCD.DrawLine(128-3,6,128-3,64-10);
-
-  GLCD.DrawVBarGraph(GLCD.Right-6, GLCD.Bottom-6, 3, -(GLCD.Height-10), 0, min_temp*10, max_temp*10, curr_mean_temp*10);
-
- if(draw_temp) {
+  GLCD.DrawVBarGraph(GLCD.Right-6, GLCD.Bottom-6, 3, -(GLCD.Height-10), 0, min_temp*10, max_temp*10, disp_temp*10);
+  
+  if(draw_temp) {
     // Update min/max values
-    sprintf(temp_buffer,"%d.%d C",(int)curr_mean_temp,(int)(curr_mean_temp*10.f)-((int)curr_mean_temp)*10);
+    convertTemperatureToString(temp_buffer,disp_temp);
     textTemp.DrawString(temp_buffer,gTextfmt_center, gTextfmt_center);
-    sprintf(temp_buffer,"%d.%d C",(int)max_temp,(int)(max_temp*10.f)-((int)max_temp)*10);
+    convertTemperatureToString(temp_buffer,max_temp);
     textMax.DrawString(temp_buffer,gTextfmt_center, gTextfmt_center);
-    sprintf(temp_buffer,"%d.%d C",(int)min_temp,(int)(min_temp*10.f)-((int)min_temp)*10);
+    convertTemperatureToString(temp_buffer,min_temp);
     textMin.DrawString(temp_buffer,gTextfmt_center, gTextfmt_center);
     draw_temp=false;
  } else {
@@ -160,8 +167,7 @@ void setup(void)
     // set the resolution to 12 bit
     sensors.setResolution(thermometer[i], TEMPERATURE_PRECISION);
   }
-  //max_temp = -1000;
-  //min_temp = 1000;
+
   EEPROM.get(0,min_temp);
   EEPROM.get(sizeof(float),max_temp);
   curr_idx = SIZE_HISTORY-1;
@@ -180,10 +186,6 @@ void setup(void)
 
 void loop(void)
 { 
-  // call sensors.requestTemperatures() to issue a global temperature 
-  // request to all devices on the bus
-  //Serial.print("Requesting temperatures...");
-
   if (Serial.available() > 0)
   {
     // read the incoming byte:

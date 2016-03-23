@@ -102,6 +102,7 @@ void convertTemperatureToString(char* tempbuffer, float temperature)
 
 void refreshDisplay(void)
 {
+  noInterrupts();
   refreshEEPROM();
   sensors.requestTemperatures();
   calcMeanTemperature();
@@ -129,16 +130,23 @@ void refreshDisplay(void)
     draw_temp=false;
  } else {
    // draw the history
+   int y_old;
    GLCD.DrawRect(0,0,SIZE_HISTORY,GLCD.Bottom+1);
-   for (int i=1;i<SIZE_HISTORY;i++) {
+   if(temp_history[(curr_idx+1)%SIZE_HISTORY]>0)
+    y_old=(temp_history[(curr_idx+1)%SIZE_HISTORY]-min_temp)/((max_temp-min_temp)/64);
+   else
+    y_old = 0;
+   for (int i=2;i<SIZE_HISTORY;i++) {
     if(temp_history[(curr_idx+i)%SIZE_HISTORY]>0) {
       int y=(temp_history[(curr_idx+i)%SIZE_HISTORY]-min_temp)/((max_temp-min_temp)/64);
       //GLCD.SetDot(i,GLCD.Bottom-y,PIXEL_ON);
-      GLCD.DrawLine(i,GLCD.Bottom,i,GLCD.Bottom-y);
+      GLCD.DrawLine(i-1,GLCD.Bottom-y_old,i,GLCD.Bottom-y);
+      y_old = y;
     }
    }
    draw_temp=true;
  }
+ interrupts();
 }
 
 void setup(void)

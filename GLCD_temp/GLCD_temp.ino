@@ -1,3 +1,4 @@
+// Adjust the pin layout of your display in the openGLCD library itself!
 #include <openGLCD.h>
 #include <TimerOne.h>
 #include <EEPROM.h>
@@ -9,8 +10,8 @@
 
 #define TEMPERATURE_PRECISION 12
 #define MAX_SENSORS 5
-#define EEPROM_RESET 450
-#define HISTORY_RESET 10
+#define EEPROM_RESET 450  // one update per hour
+#define HISTORY_RESET 40  // one update every 360 seconds
 #define SIZE_HISTORY 110
 
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
@@ -33,7 +34,7 @@ float temp_history[SIZE_HISTORY];
 unsigned int curr_idx=0;
 unsigned int history_counter=HISTORY_RESET;
 
-int eeprom_counter=EEPROM_RESET; // one update per hour
+int eeprom_counter=EEPROM_RESET; 
 
 gText textTemp = gText(0,0,GLCD.Right-10,GLCD.Bottom);
 gText textMax = gText(0,0,GLCD.Right-10,18);
@@ -80,6 +81,10 @@ void refreshEEPROM(void)
   if(--eeprom_counter<=0) {
     EEPROM.put(0,min_temp);
     EEPROM.put(sizeof(float),max_temp);
+    for(int i=0;i<SIZE_HISTORY;i++) {
+      EEPROM.put((2+i)*sizeof(float),temp_history[i]);
+    }
+    EEPROM.put((2+SIZE_HISTORY)*sizeof(float),curr_idx);
     eeprom_counter=EEPROM_RESET;
   }
 }
@@ -139,7 +144,6 @@ void refreshDisplay(void)
    for (int i=2;i<SIZE_HISTORY;i++) {
     if(temp_history[(curr_idx+i)%SIZE_HISTORY]>0) {
       int y=(temp_history[(curr_idx+i)%SIZE_HISTORY]-min_temp)/((max_temp-min_temp)/64);
-      //GLCD.SetDot(i,GLCD.Bottom-y,PIXEL_ON);
       GLCD.DrawLine(i-1,GLCD.Bottom-y_old,i,GLCD.Bottom-y);
       y_old = y;
     }
@@ -151,6 +155,13 @@ void refreshDisplay(void)
 
 void setup(void)
 {
+  GLCD.Init();
+  // Show splash screen :)
+  GLCD.DrawBitmap(ArduinoIcon64x64,GLCD.Width/2-32,GLCD.Height/2-32);
+  textTemp.SelectFont(Cooper26);
+  textMin.SelectFont(Cooper19);
+  textMax.SelectFont(Cooper19);
+  
   // start serial port
   Serial.begin(9600);
   // Start up the library
@@ -178,16 +189,11 @@ void setup(void)
 
   EEPROM.get(0,min_temp);
   EEPROM.get(sizeof(float),max_temp);
-  curr_idx = SIZE_HISTORY-1;
-  for (int i=0;i<SIZE_HISTORY;i++) {
-    temp_history[i] = 0;
+  for(int i=0;i<SIZE_HISTORY;i++) {
+    EEPROM.get((2+i)*sizeof(float),temp_history[i]);
   }
-
-  GLCD.Init();
-  textTemp.SelectFont(Cooper26);
-  textMin.SelectFont(Cooper19);
-  textMax.SelectFont(Cooper19);
-  
+  EEPROM.get((2+SIZE_HISTORY)*sizeof(float),curr_idx);
+   
   Timer1.initialize(8800000);
   Timer1.attachInterrupt(refreshDisplay);
 }
@@ -204,10 +210,13 @@ void loop(void)
       // reset min, max temperature
       max_temp = -1000;
       min_temp = 1000;
+      curr_idx = SIZE_HISTORY-1;
+      for (int i=0;i<SIZE_HISTORY;i++) {
+        temp_history[i] = 0;
+      }
       calcMeanTemperature();
-      EEPROM.put(0,min_temp);
-      EEPROM.put(sizeof(float),max_temp);
-      eeprom_counter=EEPROM_RESET;
+      eeprom_counter=1;
+      refreshEEPROM();
     }
     else
     {

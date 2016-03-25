@@ -37,8 +37,8 @@ unsigned int history_counter=HISTORY_RESET;
 int eeprom_counter=EEPROM_RESET; 
 
 gText textTemp = gText(0,0,GLCD.Right-10,GLCD.Bottom);
-gText textMax = gText(0,0,GLCD.Right-10,18);
-gText textMin = gText(0,GLCD.Bottom-18,GLCD.Right-10,GLCD.Bottom);
+gText textMax = gText(0,0,GLCD.Right-10,20);
+gText textMin = gText(0,GLCD.Bottom-18,GLCD.Right-10,GLCD.Bottom+2);
 
 char temp_buffer[10];
 bool draw_temp = true;
@@ -102,7 +102,7 @@ void updateTemperatureHistory(void)
 
 void convertTemperatureToString(char* tempbuffer, float temperature)
 {
-  sprintf(tempbuffer,"%d.%d C",(int)temperature,(int)(temperature*10.f)-((int)temperature)*10);
+  sprintf(tempbuffer,"%d.%d@C",(int)temperature,(int)(temperature*10.f)-((int)temperature)*10);
 }
 
 void refreshDisplay(void)
@@ -158,9 +158,9 @@ void setup(void)
   GLCD.Init();
   // Show splash screen :)
   GLCD.DrawBitmap(ArduinoIcon64x64,GLCD.Width/2-32,GLCD.Height/2-32);
-  textTemp.SelectFont(Cooper26);
-  textMin.SelectFont(Cooper19);
-  textMax.SelectFont(Cooper19);
+  textTemp.SelectFont(tempi26);
+  textMin.SelectFont(tempi19);
+  textMax.SelectFont(tempi19);
   
   // start serial port
   Serial.begin(9600);

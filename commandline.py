@@ -9,6 +9,7 @@ import serial
 import time
 import sys
 import getopt
+import numpy as np
 #import datetime
 #import Skype4Py
 
@@ -37,30 +38,38 @@ def main(argv):
         #skype.FriendlyName = "Temperature Status"
         #skype.Attach()
         
-    ser = serial.Serial(port=serialport,baudrate=9600)
+    ser = serial.Serial(port=serialport,baudrate=9600,timeout=10)
 
     # ignore the first two newlines
     print ser.readline()
     print ser.readline()
-    
+
     while True:
         ser.write('m')
         temp = ser.readline()
         print temp
         #if withskype:
             #skype.currentUser.setMoodText("Current Office " + temp)
-        # parse the temperature
+        time.sleep(delay)
+	# parse the temperature
         if(len(temp.split())<5):
             continue
         temperature = (temp.split()[2])
         std = (temp.split()[4])
+        try:
+            if(float(std)>1 ):
+                continue
+        except:
+            continue
+        if(np.isnan(float(std))):
+            continue
         ts = int(time.time())
         #st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
         # append to csv file
         f = open(outfilename, 'a')
         f.writelines(str(ts)+";"+temperature + ";" + std +"\n")
         f.close()
-        time.sleep(delay)
+        #time.sleep(delay)
     ser.close()
 
 

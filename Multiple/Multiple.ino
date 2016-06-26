@@ -1,3 +1,5 @@
+#include <openGLCD.h>
+
 #include <TimerOne.h>
 
 #include <LiquidCrystal.h>

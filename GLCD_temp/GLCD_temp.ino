@@ -4,9 +4,12 @@
 #include <EEPROM.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <DHT.h>
 
 // Data wire is plugged into pin 10 on the Arduino
 #define ONE_WIRE_BUS 10
+#define DHT_BUS 11
+#define DHT_TYPE DHT22
 
 #define TEMPERATURE_PRECISION 12
 #define MAX_SENSORS 5
@@ -20,32 +23,44 @@ OneWire oneWire(ONE_WIRE_BUS);
 // Pass our oneWire reference to Dallas Temperature.
 DallasTemperature sensors(&oneWire);
 
+// Initialize DHT sensor.
+DHT dht(DHT_BUS, DHT_TYPE);
+
 // arrays to hold device addresses
 DeviceAddress thermometer[MAX_SENSORS];
 
 int8_t num_sensors;
 
 float cal_temp = -0.4f;
+float cal_hum = 18;
 float curr_mean_temp;
 float curr_std_temp;
 float min_temp;
 float max_temp;
 float temp_history[SIZE_HISTORY];
+float curr_humidity;
+float feels_like;
 unsigned int curr_idx = 0;
 unsigned int history_counter = HISTORY_RESET;
 
 int eeprom_counter = EEPROM_RESET;
 
-gText textTemp = gText(0, 0, GLCD.Right - 10, GLCD.Bottom);
-gText textMax = gText(0, 0, GLCD.Right - 10, 20);
-gText textMin = gText(0, GLCD.Bottom - 18, GLCD.Right - 10, GLCD.Bottom + 2);
+gText textTemp = gText(SIZE_HISTORY/3, 0, SIZE_HISTORY/3*2, GLCD.Bottom/2);
+gText textMax = gText(SIZE_HISTORY/3*2, 0, SIZE_HISTORY, GLCD.Bottom/2);
+gText textMin = gText(0, 0, SIZE_HISTORY/3, GLCD.Bottom/2);
+gText textHum = gText(0, GLCD.Bottom/2, SIZE_HISTORY/2,GLCD.Bottom);
+gText textFeels = gText(SIZE_HISTORY/2, GLCD.Bottom/2, SIZE_HISTORY,GLCD.Bottom);
 gText textTempSmall = gText(2, GLCD.Bottom - 10, 32, GLCD.Bottom - 1);
+gText textLabelUpper = gText(1,2,SIZE_HISTORY,GLCD.Bottom/4);
+gText textLabelLower = gText(3,GLCD.Bottom/2+2,SIZE_HISTORY,GLCD.Bottom/4*3);
 
 char temp_buffer[10];
 int draw_temp = 1;
 
 void calcMeanTemperature(void)
 {
+  curr_humidity = dht.readHumidity()+cal_hum;
+
   sensors.requestTemperatures();
   curr_mean_temp = 0.0f;
   curr_std_temp = 0.0f;
@@ -68,6 +83,9 @@ void calcMeanTemperature(void)
     if (max_temp < curr_mean_temp)
       max_temp = curr_mean_temp;
   }
+  feels_like = (curr_mean_temp<27 || curr_humidity<40)?
+                     curr_mean_temp:
+                     dht.computeHeatIndex(curr_mean_temp,curr_humidity);
 }
 
 void printMeanTemperature(void)
@@ -104,7 +122,7 @@ void updateTemperatureHistory(void)
 
 void convertTemperatureToString(char* tempbuffer, float temperature)
 {
-  sprintf(tempbuffer, "%d.%d@C", (int)temperature, min(9, round(((int)(temperature * 100.f) - ((int)temperature) * 100.f) / 10.f)));
+  sprintf(tempbuffer, "%d.%d", (int)temperature, min(9, round(((int)(temperature * 100.f) - ((int)temperature) * 100.f) / 10.f)));
 }
 
 void refreshDisplay(void)
@@ -134,6 +152,17 @@ void refreshDisplay(void)
     textMax.DrawString(temp_buffer, gTextfmt_center, gTextfmt_center);
     convertTemperatureToString(temp_buffer, min_temp);
     textMin.DrawString(temp_buffer, gTextfmt_center, gTextfmt_center);
+    convertTemperatureToString(temp_buffer, feels_like);
+    textFeels.DrawString(temp_buffer, gTextfmt_center, gTextfmt_bottom);
+    sprintf(temp_buffer,"%d%%",(int)curr_humidity);
+    textHum.DrawString(temp_buffer, gTextfmt_center, gTextfmt_bottom);
+    // draw labels
+    textLabelUpper.DrawString(F(" Min   Curr   Max"),gTextfmt_left, gTextfmt_top);
+    textLabelLower.DrawString(F("Humidity     Felt"),gTextfmt_left, gTextfmt_top);
+    // draw seperators
+    GLCD.DrawLine(0,GLCD.Bottom/2-5,SIZE_HISTORY-1,GLCD.Bottom/2-5);
+    GLCD.DrawLine(SIZE_HISTORY/3,0,SIZE_HISTORY/3,GLCD.Bottom/2-5);
+    GLCD.DrawLine(SIZE_HISTORY/3*2,0,SIZE_HISTORY/3*2,GLCD.Bottom/2-5);
     if (curr_mean_temp > 30)
       draw_temp = 2;
     else
@@ -153,13 +182,13 @@ void refreshDisplay(void)
       }
     }
     // draw the current temp small
-    sprintf(temp_buffer, "%d.%dC", (int)disp_temp, min(9, round(((int)(disp_temp * 100.f) - ((int)disp_temp) * 100.f) / 10.f)));
+    convertTemperatureToString(temp_buffer, disp_temp);
     textTempSmall.DrawString(temp_buffer, gTextfmt_left, gTextfmt_center);
     draw_temp = 1;
   } else if (draw_temp == 2) {
     GLCD.DrawBitmap(weather, GLCD.Width / 2 - 32, GLCD.Height / 2 - 32);
     // draw the current temp small
-    sprintf(temp_buffer, "%d.%dC", (int)disp_temp, min(9, round(((int)(disp_temp * 100.f) - ((int)disp_temp) * 100.f) / 10.f)));
+    convertTemperatureToString(temp_buffer, disp_temp);
     textTempSmall.DrawString(temp_buffer, gTextfmt_left, gTextfmt_center);
     draw_temp = 0;
   }
@@ -174,15 +203,21 @@ void setup(void)
   GLCD.Init();
   // Show splash screen :)
   GLCD.DrawBitmap(weather, GLCD.Width / 2 - 32, GLCD.Height / 2 - 32);
-  textTemp.SelectFont(tempi26);
-  textMin.SelectFont(tempi19);
-  textMax.SelectFont(tempi19);
+  textTemp.SelectFont(Callibri15);
+  textMin.SelectFont(Callibri15);
+  textMax.SelectFont(Callibri15);
+  textHum.SelectFont(Cooper21);
+  textFeels.SelectFont(Cooper21);
   textTempSmall.SelectFont(System5x7);
+  textLabelUpper.SelectFont(System5x7);
+  textLabelLower.SelectFont(System5x7);
 
   // start serial port
   Serial.begin(9600);
   // Start up the library
   sensors.begin();
+
+  dht.begin();
 
   // locate devices on the bus
   Serial.print("Locating devices...");

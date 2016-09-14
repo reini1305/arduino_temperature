@@ -45,6 +45,8 @@ def main(argv):
     # ignore the first two newlines
     print ser.readline()
     print ser.readline()
+    
+    skip_pushing = 0
 
     while True:
         ser.write('m')
@@ -72,13 +74,18 @@ def main(argv):
         f.writelines(str(ts)+";"+temperature + ";" + std +"\n")
         f.close()
         
-        opener = urllib2.build_opener(urllib2.HTTPSHandler)
-        request = urllib2.Request('https://timeline-api.getpebble.com/v1/user/glance', data=json.dumps({"slices":[{"layout":{"icon": "system://images/TIMELINE_SUN","subtitleTemplateString": "Temp: "+temperature+" C"}}]}))
-        request.add_header('Content-Type', 'application/json')
-        request.add_header('X-User-Token', 'SBZKECjpmQq3UZytnjYJjACN48iVYclO')
-        request.get_method = lambda: 'PUT'
-        url = opener.open(request)
-        print url.msg
+        skip_pushing = skip_pushing+1
+        
+        if(skip_pushing>30):
+          opener = urllib2.build_opener(urllib2.HTTPSHandler)
+          request = urllib2.Request('https://timeline-api.getpebble.com/v1/user/glance', data=json.dumps({"slices":[{"layout":{"icon": "system://images/TIMELINE_SUN","subtitleTemplateString": "Temp: "+temperature+" C"}}]}))
+          request.add_header('Content-Type', 'application/json')
+          request.add_header('X-User-Token', 'SBZKECjpmQq3UZytnjYJjACN48iVYclO')
+          request.get_method = lambda: 'PUT'
+          url = opener.open(request)
+          print url.msg
+          skip_pushing=0
+          
         time.sleep(delay)
     ser.close()
 

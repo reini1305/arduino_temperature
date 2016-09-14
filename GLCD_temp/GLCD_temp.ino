@@ -32,7 +32,7 @@ DeviceAddress thermometer[MAX_SENSORS];
 int8_t num_sensors;
 
 float cal_temp = -0.4f;
-float cal_hum = 18;
+float cal_hum = 17;
 float curr_mean_temp;
 float curr_std_temp;
 float min_temp;
@@ -45,9 +45,9 @@ unsigned int history_counter = HISTORY_RESET;
 
 int eeprom_counter = EEPROM_RESET;
 
-gText textTemp = gText(SIZE_HISTORY/3, 0, SIZE_HISTORY/3*2, GLCD.Bottom/2);
-gText textMax = gText(SIZE_HISTORY/3*2, 0, SIZE_HISTORY, GLCD.Bottom/2);
-gText textMin = gText(0, 0, SIZE_HISTORY/3, GLCD.Bottom/2);
+gText textTemp = gText(SIZE_HISTORY/3, 2, SIZE_HISTORY/3*2, GLCD.Bottom/2);
+gText textMax = gText(SIZE_HISTORY/3*2, 2, SIZE_HISTORY, GLCD.Bottom/2);
+gText textMin = gText(0, 2, SIZE_HISTORY/3, GLCD.Bottom/2);
 gText textHum = gText(0, GLCD.Bottom/2, SIZE_HISTORY/2,GLCD.Bottom);
 gText textFeels = gText(SIZE_HISTORY/2, GLCD.Bottom/2, SIZE_HISTORY,GLCD.Bottom);
 gText textTempSmall = gText(2, GLCD.Bottom - 10, 32, GLCD.Bottom - 1);
@@ -83,9 +83,9 @@ void calcMeanTemperature(void)
     if (max_temp < curr_mean_temp)
       max_temp = curr_mean_temp;
   }
-  feels_like = (curr_mean_temp<27 || curr_humidity<40)?
-                     curr_mean_temp:
-                     dht.computeHeatIndex(curr_mean_temp,curr_humidity);
+  feels_like = /*(curr_mean_temp<27 || curr_humidity<40)?
+                     curr_mean_temp:*/
+                     dht.computeHeatIndex(curr_mean_temp,curr_humidity,false);
 }
 
 void printMeanTemperature(void)
@@ -145,6 +145,9 @@ void refreshDisplay(void)
   GLCD.DrawVBarGraph(GLCD.Right - 6, GLCD.Bottom - 6, 3, -(GLCD.Height - 10), 0, min_temp * 10, max_temp * 10, disp_temp * 10);
 
   if (draw_temp == 1) {
+    // draw labels
+    textLabelUpper.DrawString("   Min     Current    Max",gTextfmt_left, gTextfmt_top);
+    textLabelLower.DrawString("  Humidity       Feels Like",gTextfmt_left, gTextfmt_top);
     // Update min/max values
     convertTemperatureToString(temp_buffer, disp_temp);
     textTemp.DrawString(temp_buffer, gTextfmt_center, gTextfmt_center);
@@ -156,9 +159,7 @@ void refreshDisplay(void)
     textFeels.DrawString(temp_buffer, gTextfmt_center, gTextfmt_bottom);
     sprintf(temp_buffer,"%d%%",(int)curr_humidity);
     textHum.DrawString(temp_buffer, gTextfmt_center, gTextfmt_bottom);
-    // draw labels
-    textLabelUpper.DrawString(F(" Min   Curr   Max"),gTextfmt_left, gTextfmt_top);
-    textLabelLower.DrawString(F("Humidity     Felt"),gTextfmt_left, gTextfmt_top);
+
     // draw seperators
     GLCD.DrawLine(0,GLCD.Bottom/2-5,SIZE_HISTORY-1,GLCD.Bottom/2-5);
     GLCD.DrawLine(SIZE_HISTORY/3,0,SIZE_HISTORY/3,GLCD.Bottom/2-5);
@@ -209,8 +210,8 @@ void setup(void)
   textHum.SelectFont(Cooper21);
   textFeels.SelectFont(Cooper21);
   textTempSmall.SelectFont(System5x7);
-  textLabelUpper.SelectFont(System5x7);
-  textLabelLower.SelectFont(System5x7);
+  textLabelUpper.SelectFont(Callibri10);
+  textLabelLower.SelectFont(Callibri10);
 
   // start serial port
   Serial.begin(9600);

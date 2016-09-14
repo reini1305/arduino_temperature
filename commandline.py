@@ -9,6 +9,8 @@ import serial
 import time
 import sys
 import getopt
+import urllib2
+import json
 import numpy as np
 #import datetime
 #import Skype4Py
@@ -50,7 +52,7 @@ def main(argv):
         print temp
         #if withskype:
             #skype.currentUser.setMoodText("Current Office " + temp)
-        time.sleep(delay)
+        
 	# parse the temperature
         if(len(temp.split())<5):
             continue
@@ -69,7 +71,15 @@ def main(argv):
         f = open(outfilename, 'a')
         f.writelines(str(ts)+";"+temperature + ";" + std +"\n")
         f.close()
-        #time.sleep(delay)
+        
+        opener = urllib2.build_opener(urllib2.HTTPSHandler)
+        request = urllib2.Request('https://timeline-api.getpebble.com/v1/user/glance', data=json.dumps({"slices":[{"layout":{"icon": "system://images/TIMELINE_SUN","subtitleTemplateString": "Temp: "+temperature+" C"}}]}))
+        request.add_header('Content-Type', 'application/json')
+        request.add_header('X-User-Token', 'SBZKECjpmQq3UZytnjYJjACN48iVYclO')
+        request.get_method = lambda: 'PUT'
+        url = opener.open(request)
+        print url.msg
+        time.sleep(delay)
     ser.close()
 
 

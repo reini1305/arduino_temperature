@@ -1,0 +1,26 @@
+{
+  "name": "office_temp",
+  "author": "Christian Reinbacher",
+  "version": "1.0.0",
+  "keywords": ["pebble-app"],
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "office_temp",
+    "uuid": "24f99be8-bd6b-4ce0-b182-7b9e598c7a00",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "diorite"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": [
+      "dummy"
+    ],
+    "resources": {
+      "media": []
+    }
+  }
+}

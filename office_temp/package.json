@@ -1,7 +1,7 @@
 {
   "name": "office_temp",
   "author": "Christian Reinbacher",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "keywords": ["pebble-app"],
   "private": true,
   "dependencies": {},
@@ -22,7 +22,21 @@
       "dummy"
     ],
     "resources": {
-      "media": []
+      "media": [
+        {
+          "name": "IMAGE_LOGO_TINY",
+          "file": "logo_tiny.png",
+          "type": "bitmap",
+          "menuIcon": true
+        }
+      ],
+      "publishedMedia": [
+        {
+          "name": "LOGO",
+          "id": 1,
+          "glance": "IMAGE_LOGO_TINY"
+        }
+      ]
     }
   }
 }

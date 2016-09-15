@@ -80,7 +80,7 @@ def main(argv):
           opener = urllib2.build_opener(urllib2.HTTPSHandler)
           request = urllib2.Request('https://timeline-api.getpebble.com/v1/user/glance', data=json.dumps({"slices":[{"layout":{"icon": "system://images/TIMELINE_SUN","subtitleTemplateString": "Temp: "+temperature+" C"}}]}))
           request.add_header('Content-Type', 'application/json')
-          request.add_header('X-User-Token', 'SBZKECjpmQq3UZytnjYJjACN48iVYclO')
+          request.add_header('X-User-Token', 'INSERT_HERE')
           request.get_method = lambda: 'PUT'
           url = opener.open(request)
           print url.msg

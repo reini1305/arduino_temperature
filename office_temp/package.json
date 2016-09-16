@@ -1,12 +1,12 @@
 {
   "name": "office_temp",
   "author": "Christian Reinbacher",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "keywords": ["pebble-app"],
   "private": true,
   "dependencies": {},
   "pebble": {
-    "displayName": "Office Temperature",
+    "displayName": "Office Temp",
     "uuid": "24f99be8-bd6b-4ce0-b182-7b9e598c7a00",
     "sdkVersion": "3",
     "enableMultiJS": true,

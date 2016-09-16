@@ -12,6 +12,7 @@ import getopt
 import urllib2
 import json
 import numpy as np
+from datetime import datetime
 #import datetime
 #import Skype4Py
 
@@ -46,7 +47,7 @@ def main(argv):
     print ser.readline()
     print ser.readline()
     
-    skip_pushing = 0
+    skip_pushing = 30
 
     while True:
         ser.write('m')
@@ -77,8 +78,12 @@ def main(argv):
         skip_pushing = skip_pushing+1
         
         if(skip_pushing>30):
+          now = datetime.now()
+          output_string = temperature+"°C "+str(now.hour)+":"+str(now.minute)+", "+str(now.day)+"."+str(now.month)+"."
           opener = urllib2.build_opener(urllib2.HTTPSHandler)
-          request = urllib2.Request('https://timeline-api.getpebble.com/v1/user/glance', data=json.dumps({"slices":[{"layout":{"icon": "system://images/TIMELINE_SUN","subtitleTemplateString": "Temp: "+temperature+" C"}}]}))
+          request = urllib2.Request('https://timeline-api.getpebble.com/v1/user/glance', 
+                                data=json.dumps({"slices":[{"layout":{"icon": "system://images/TIMELINE_SUN",
+                                "subtitleTemplateString": output_string}}]}))
           request.add_header('Content-Type', 'application/json')
           request.add_header('X-User-Token', 'INSERT_HERE')
           request.get_method = lambda: 'PUT'

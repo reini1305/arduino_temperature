@@ -79,7 +79,7 @@ def main(argv):
         
         if(skip_pushing>30):
           now = datetime.now()
-          output_string = temperature+"°C "+str(now.hour)+":"+str(now.minute)+", "+str(now.day)+"."+str(now.month)+"."
+          output_string = temperature+"°C "+str(now.hour)+":"+str(now.minute).zfill(2)+", "+str(now.day)+"."+str(now.month)+"."
           opener = urllib2.build_opener(urllib2.HTTPSHandler)
           request = urllib2.Request('https://timeline-api.getpebble.com/v1/user/glance', 
                                 data=json.dumps({"slices":[{"layout":{"icon": "system://images/TIMELINE_SUN",

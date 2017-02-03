@@ -13,7 +13,8 @@
     "targetPlatforms": [
       "diorite",
       "chalk",
-      "basalt"
+      "basalt",
+      "emery"
     ],
     "watchapp": {
       "watchface": false

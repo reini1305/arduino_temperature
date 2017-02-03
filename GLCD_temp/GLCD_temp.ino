@@ -83,6 +83,9 @@ void calcMeanTemperature(void)
     if (max_temp < curr_mean_temp)
       max_temp = curr_mean_temp;
   }
+  if (curr_humidity < cal_hum)
+    feels_like = curr_mean_temp;
+  else
   feels_like = /*(curr_mean_temp<27 || curr_humidity<40)?
                      curr_mean_temp:*/
                      dht.computeHeatIndex(curr_mean_temp,curr_humidity,false);

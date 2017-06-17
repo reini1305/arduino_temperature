@@ -1,7 +1,8 @@
 // Adjust the pin layout of your display in the openGLCD library itself!
 #include <openGLCD.h>
 #include <TimerOne.h>
-#include <EEPROM.h>
+#include <EEPROMex.h>
+#include <EEPROMVar.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <DHT.h>
@@ -12,50 +13,56 @@
 #define DHT_TYPE DHT22
 
 #define TEMPERATURE_PRECISION 12
-#define MAX_SENSORS 5
-#define EEPROM_RESET 450  // one update per hour
-#define HISTORY_RESET 40  // one update every 360 seconds
-#define SIZE_HISTORY 110
+#define MAX_SENSORS           5
+#define EEPROM_RESET          450  // one update per hour
+#define HISTORY_RESET         80  // one update every 720 seconds
+#define SIZE_HISTORY          110
 
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
-OneWire oneWire(ONE_WIRE_BUS);
+OneWire           oneWire(ONE_WIRE_BUS);
 
 // Pass our oneWire reference to Dallas Temperature.
 DallasTemperature sensors(&oneWire);
 
 // Initialize DHT sensor.
-DHT dht(DHT_BUS, DHT_TYPE);
+DHT              dht(DHT_BUS, DHT_TYPE);
 
 // arrays to hold device addresses
-DeviceAddress thermometer[MAX_SENSORS];
+DeviceAddress    thermometer[MAX_SENSORS];
 
-int8_t num_sensors;
+int8_t           num_sensors;
+float            cal_temp = -1.1f;
+float            cal_hum = 17;
+float            curr_mean_temp;
+float            curr_std_temp;
+float            min_temp;
+float            max_temp;
+float            temp_history[SIZE_HISTORY];
+unsigned char    humidity_history[SIZE_HISTORY];
+float            curr_humidity;
+unsigned char    min_humidity;
+unsigned char    max_humidity;
+float            feels_like;
+unsigned int     curr_idx = 0;
+unsigned int     history_counter = HISTORY_RESET;
+int              eeprom_counter = EEPROM_RESET;
+bool             update_screen = false;
+char             temp_buffer[10];
+int              draw_temp = 1;
 
-float cal_temp = -0.4f;
-float cal_hum = 17;
-float curr_mean_temp;
-float curr_std_temp;
-float min_temp;
-float max_temp;
-float temp_history[SIZE_HISTORY];
-float curr_humidity;
-float feels_like;
-unsigned int curr_idx = 0;
-unsigned int history_counter = HISTORY_RESET;
-
-int eeprom_counter = EEPROM_RESET;
-
-gText textTemp = gText(SIZE_HISTORY/3, 2, SIZE_HISTORY/3*2, GLCD.Bottom/2);
-gText textMax = gText(SIZE_HISTORY/3*2, 2, SIZE_HISTORY, GLCD.Bottom/2);
-gText textMin = gText(0, 2, SIZE_HISTORY/3, GLCD.Bottom/2);
-gText textHum = gText(0, GLCD.Bottom/2, SIZE_HISTORY/2,GLCD.Bottom);
-gText textFeels = gText(SIZE_HISTORY/2, GLCD.Bottom/2, SIZE_HISTORY,GLCD.Bottom);
-gText textTempSmall = gText(2, GLCD.Bottom - 10, 32, GLCD.Bottom - 1);
+gText textTemp       = gText(SIZE_HISTORY/3, 2, SIZE_HISTORY/3*2, GLCD.Bottom/2);
+gText textMax        = gText(SIZE_HISTORY/3*2, 2, SIZE_HISTORY, GLCD.Bottom/2);
+gText textMin        = gText(0, 2, SIZE_HISTORY/3, GLCD.Bottom/2);
+gText textHum        = gText(0, GLCD.Bottom/2, SIZE_HISTORY/2,GLCD.Bottom);
+gText textFeels      = gText(SIZE_HISTORY/2, GLCD.Bottom/2, SIZE_HISTORY,GLCD.Bottom);
+gText textTempSmall  = gText(2, GLCD.Bottom - 10, 32, GLCD.Bottom - 1);
 gText textLabelUpper = gText(1,2,SIZE_HISTORY,GLCD.Bottom/4);
 gText textLabelLower = gText(3,GLCD.Bottom/2+2,SIZE_HISTORY,GLCD.Bottom/4*3);
 
-char temp_buffer[10];
-int draw_temp = 1;
+void forceUpdate(void)
+{
+  update_screen = true;
+}
 
 void calcMeanTemperature(void)
 {
@@ -65,58 +72,59 @@ void calcMeanTemperature(void)
   curr_mean_temp = 0.0f;
   curr_std_temp = 0.0f;
   for (uint8_t i = 0; i < num_sensors; i++)
-  {
     curr_mean_temp += sensors.getTempC(thermometer[i]);
-  }
   curr_mean_temp /= num_sensors;
+  
   for (uint8_t i = 0; i < num_sensors; i++)
-  {
     curr_std_temp += (sensors.getTempC(thermometer[i]) - curr_mean_temp) * (sensors.getTempC(thermometer[i]) - curr_mean_temp);
-  }
   curr_mean_temp += cal_temp;
   curr_std_temp /= num_sensors;
   curr_std_temp = sqrt(curr_std_temp);
+  
   if (curr_std_temp < 0.2)
   {
     if (min_temp > curr_mean_temp)
       min_temp = curr_mean_temp;
     if (max_temp < curr_mean_temp)
       max_temp = curr_mean_temp;
+    if (min_humidity > curr_humidity)
+      min_humidity = curr_humidity;
+    if (max_humidity < curr_humidity)
+      max_humidity = curr_humidity;
   }
-  if (curr_humidity < cal_hum)
-    feels_like = curr_mean_temp;
-  else
-  feels_like = /*(curr_mean_temp<27 || curr_humidity<40)?
-                     curr_mean_temp:*/
-                     dht.computeHeatIndex(curr_mean_temp,curr_humidity,false);
+
+  feels_like = (curr_humidity < cal_hum)? curr_mean_temp : dht.computeHeatIndex(curr_mean_temp,curr_humidity,false);
 }
 
 void printMeanTemperature(void)
 {
-  Serial.print("Temp C: ");
+  Serial.print(F("Temp C: "));
   Serial.print(curr_mean_temp);
-  Serial.print(" +- ");
+  Serial.print(F(" +- "));
   Serial.println(curr_std_temp);
 }
 
 void refreshEEPROM(void)
 {
   if (--eeprom_counter <= 0) {
-    EEPROM.put(0, min_temp);
-    EEPROM.put(sizeof(float), max_temp);
-    for (int i = 0; i < SIZE_HISTORY; i++) {
-      EEPROM.put((2 + i)*sizeof(float), temp_history[i]);
-    }
-    EEPROM.put((2 + SIZE_HISTORY)*sizeof(float), curr_idx);
+    EEPROM.updateFloat(0, min_temp);
+    EEPROM.updateFloat(sizeof(float), max_temp);
+    EEPROM.updateBlock(2*sizeof(float),temp_history,SIZE_HISTORY);
+    EEPROM.updateInt((2 + SIZE_HISTORY)*sizeof(float), curr_idx);
+    const unsigned int offset = (3 + SIZE_HISTORY)*sizeof(float);
+    EEPROM.updateFloat(offset, min_humidity);
+    EEPROM.updateFloat(offset + 1, max_humidity);
+    EEPROM.updateBlock(offset + 2, humidity_history, SIZE_HISTORY);
     eeprom_counter = EEPROM_RESET;
   }
 }
 
-void updateTemperatureHistory(void)
+void updateHistory(void)
 {
   if (--history_counter == 0) {
     if (curr_std_temp < 0.2) {
       temp_history[curr_idx] = curr_mean_temp;
+      humidity_history[curr_idx] = curr_humidity;
       curr_idx = (curr_idx + 1) % SIZE_HISTORY;
     }
     history_counter = HISTORY_RESET;
@@ -130,11 +138,10 @@ void convertTemperatureToString(char* tempbuffer, float temperature)
 
 void refreshDisplay(void)
 {
-  noInterrupts();
   refreshEEPROM();
   
   calcMeanTemperature();
-  updateTemperatureHistory();
+  updateHistory();
   float disp_temp = constrain(curr_mean_temp, min_temp, max_temp);
 
   GLCD.ClearScreen();
@@ -149,8 +156,8 @@ void refreshDisplay(void)
 
   if (draw_temp == 1) {
     // draw labels
-    textLabelUpper.DrawString("   Min     Current    Max",gTextfmt_left, gTextfmt_top);
-    textLabelLower.DrawString("  Humidity       Feels Like",gTextfmt_left, gTextfmt_top);
+    textLabelUpper.DrawString(F("   Min     Current    Max"),gTextfmt_left, gTextfmt_top);
+    textLabelLower.DrawString(F("  Humidity       Feels Like"),gTextfmt_left, gTextfmt_top);
     // Update min/max values
     convertTemperatureToString(temp_buffer, disp_temp);
     textTemp.DrawString(temp_buffer, gTextfmt_center, gTextfmt_center);
@@ -175,12 +182,25 @@ void refreshDisplay(void)
     // draw the history
     int y_old;
     if (temp_history[(curr_idx + 1) % SIZE_HISTORY] > 0)
-      y_old = (temp_history[(curr_idx + 1) % SIZE_HISTORY]-0.1 - min_temp) / ((max_temp - min_temp) / 64);
+      y_old = constrain((temp_history[(curr_idx + 1) % SIZE_HISTORY] - min_temp) / ((max_temp - min_temp + 0.1) / 64),1,63);
     else
       y_old = 0;
     for (int i = 2; i < SIZE_HISTORY; i++) {
       if (temp_history[(curr_idx + i) % SIZE_HISTORY] > 0) {
-        int y = (temp_history[(curr_idx + i) % SIZE_HISTORY]-0.1 - min_temp) / ((max_temp - min_temp) / 64);
+        int y = constrain((temp_history[(curr_idx + i) % SIZE_HISTORY] - min_temp) / ((max_temp - min_temp + 0.1) / 64),1,63);
+        GLCD.DrawLine(i - 1, GLCD.Bottom - y_old, i, GLCD.Bottom - y);
+        GLCD.DrawLine(i - 1, GLCD.Bottom - y_old - 1, i, GLCD.Bottom - y - 1);
+        GLCD.DrawLine(i - 1, GLCD.Bottom - y_old + 1, i, GLCD.Bottom - y + 1);
+        y_old = y;
+      }
+    }
+    if (humidity_history[(curr_idx + 1) % SIZE_HISTORY] > 0)
+      y_old = constrain((humidity_history[(curr_idx + 1) % SIZE_HISTORY] - min_humidity) / ((max_humidity - min_humidity + 0.1) / 64),1,63);
+    else
+      y_old = 0;
+    for (int i = 2; i < SIZE_HISTORY; i++) {
+      if (humidity_history[(curr_idx + i) % SIZE_HISTORY] > 0) {
+        int y = constrain((humidity_history[(curr_idx + i) % SIZE_HISTORY] - min_humidity) / ((max_humidity - min_humidity + 0.1) / 64),1,63);
         GLCD.DrawLine(i - 1, GLCD.Bottom - y_old, i, GLCD.Bottom - y);
         y_old = y;
       }
@@ -199,7 +219,7 @@ void refreshDisplay(void)
   // Draw surrounding rectangle
   GLCD.DrawRect(0, 0, SIZE_HISTORY, GLCD.Bottom + 1);
   
-  interrupts();
+  update_screen = false;
 }
 
 void setup(void)
@@ -224,14 +244,14 @@ void setup(void)
   dht.begin();
 
   // locate devices on the bus
-  Serial.print("Locating devices...");
-  Serial.print("Found ");
+  Serial.print(F("Locating devices..."));
+  Serial.print(F("Found "));
   num_sensors = sensors.getDeviceCount();
   Serial.print(num_sensors, DEC);
-  Serial.println(" devices.");
+  Serial.println(F(" devices."));
 
   // report parasite power requirements
-  Serial.print("Parasite power is: ");
+  Serial.print(F("Parasite power is: "));
   if (sensors.isParasitePowerMode()) Serial.println("ON");
   else Serial.println("OFF");
 
@@ -243,16 +263,19 @@ void setup(void)
     sensors.setResolution(thermometer[i], TEMPERATURE_PRECISION);
   }
 
-  EEPROM.get(0, min_temp);
-  EEPROM.get(sizeof(float), max_temp);
-  for (int i = 0; i < SIZE_HISTORY; i++) {
-    EEPROM.get((2 + i)*sizeof(float), temp_history[i]);
-  }
-  EEPROM.get((2 + SIZE_HISTORY)*sizeof(float), curr_idx);
+  // load history from EEPROM
+  min_temp = EEPROM.readFloat(0);
+  max_temp = EEPROM.readFloat(sizeof(float));
+  EEPROM.readBlock(2*sizeof(float),temp_history,SIZE_HISTORY);
+  curr_idx = EEPROM.readInt((2 + SIZE_HISTORY)*sizeof(float));
+  const unsigned int offset = (3 + SIZE_HISTORY)*sizeof(float);
+  min_humidity = EEPROM.readByte(offset);
+  max_humidity = EEPROM.readByte(offset + 1);
+  EEPROM.readBlock(offset + 2,humidity_history,SIZE_HISTORY);
 
   calcMeanTemperature();
   Timer1.initialize(8800000);
-  Timer1.attachInterrupt(refreshDisplay);
+  Timer1.attachInterrupt(forceUpdate);
 }
 
 void loop(void)
@@ -270,18 +293,20 @@ void loop(void)
       curr_idx = SIZE_HISTORY - 1;
       for (int i = 0; i < SIZE_HISTORY; i++) {
         temp_history[i] = 0;
+        humidity_history[i] = 0;
       }
+      max_humidity = 0;
+      min_humidity = 100;
+      
       calcMeanTemperature();
       eeprom_counter = 1;
       refreshEEPROM();
     }
     else
-    {
-      //calcMeanTemperature();
       printMeanTemperature();
-    }
   }
-
+  if(update_screen)
+    refreshDisplay();
 }
 
 

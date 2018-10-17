@@ -17,6 +17,7 @@
 #define EEPROM_RESET          450  // one update per hour
 #define HISTORY_RESET         80  // one update every 720 seconds
 #define SIZE_HISTORY          110
+#define FLASH_OFFSET          0
 
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire           oneWire(ONE_WIRE_BUS);
@@ -32,13 +33,13 @@ DeviceAddress    thermometer[MAX_SENSORS];
 
 int8_t           num_sensors;
 float            cal_temp = -1.1f;
-float            cal_hum = 17;
+float            cal_hum = 24;
 float            curr_mean_temp;
 float            curr_std_temp;
 float            min_temp;
 float            max_temp;
 float            temp_history[SIZE_HISTORY];
-unsigned char    humidity_history[SIZE_HISTORY];
+unsigned short   humidity_history[SIZE_HISTORY];
 float            curr_humidity;
 unsigned char    min_humidity;
 unsigned char    max_humidity;
@@ -101,20 +102,22 @@ void printMeanTemperature(void)
   Serial.print(F("Temp C: "));
   Serial.print(curr_mean_temp);
   Serial.print(F(" +- "));
-  Serial.println(curr_std_temp);
+  Serial.print(curr_std_temp);
+  Serial.print(" ");
+  Serial.println(curr_humidity);
 }
 
 void refreshEEPROM(void)
 {
   if (--eeprom_counter <= 0) {
-    EEPROM.updateFloat(0, min_temp);
-    EEPROM.updateFloat(sizeof(float), max_temp);
-    EEPROM.updateBlock(2*sizeof(float),temp_history,SIZE_HISTORY);
-    EEPROM.updateInt((2 + SIZE_HISTORY)*sizeof(float), curr_idx);
+    EEPROM.updateFloat(FLASH_OFFSET + 0, min_temp);
+    EEPROM.updateFloat(FLASH_OFFSET + sizeof(float), max_temp);
+    EEPROM.updateBlock(FLASH_OFFSET + 2*sizeof(float),temp_history,SIZE_HISTORY);
+    EEPROM.updateInt(FLASH_OFFSET   + (2 + SIZE_HISTORY)*sizeof(float), curr_idx);
     const unsigned int offset = (3 + SIZE_HISTORY)*sizeof(float);
-    EEPROM.updateFloat(offset, min_humidity);
-    EEPROM.updateFloat(offset + 1, max_humidity);
-    EEPROM.updateBlock(offset + 2, humidity_history, SIZE_HISTORY);
+    EEPROM.updateFloat(FLASH_OFFSET + offset, min_humidity);
+    EEPROM.updateFloat(FLASH_OFFSET + offset + 1, max_humidity);
+    EEPROM.updateBlock(FLASH_OFFSET + offset + 2, humidity_history, SIZE_HISTORY*sizeof(unsigned short));
     eeprom_counter = EEPROM_RESET;
   }
 }
@@ -124,7 +127,7 @@ void updateHistory(void)
   if (--history_counter == 0) {
     if (curr_std_temp < 0.2) {
       temp_history[curr_idx] = curr_mean_temp;
-      humidity_history[curr_idx] = curr_humidity;
+      humidity_history[curr_idx] = curr_humidity * 10;
       curr_idx = (curr_idx + 1) % SIZE_HISTORY;
     }
     history_counter = HISTORY_RESET;
@@ -195,12 +198,12 @@ void refreshDisplay(void)
       }
     }
     if (humidity_history[(curr_idx + 1) % SIZE_HISTORY] > 0)
-      y_old = constrain((humidity_history[(curr_idx + 1) % SIZE_HISTORY] - min_humidity) / ((max_humidity - min_humidity + 0.1) / 64),1,63);
+      y_old = constrain((humidity_history[(curr_idx + 1) % SIZE_HISTORY]/10.f - min_humidity) / ((max_humidity - min_humidity + 0.1) / 64),1,63);
     else
       y_old = 0;
     for (int i = 2; i < SIZE_HISTORY; i++) {
       if (humidity_history[(curr_idx + i) % SIZE_HISTORY] > 0) {
-        int y = constrain((humidity_history[(curr_idx + i) % SIZE_HISTORY] - min_humidity) / ((max_humidity - min_humidity + 0.1) / 64),1,63);
+        int y = constrain((humidity_history[(curr_idx + i) % SIZE_HISTORY]/10.f - min_humidity) / ((max_humidity - min_humidity + 0.1) / 64),1,63);
         GLCD.DrawLine(i - 1, GLCD.Bottom - y_old, i, GLCD.Bottom - y);
         y_old = y;
       }
@@ -264,14 +267,16 @@ void setup(void)
   }
 
   // load history from EEPROM
-  min_temp = EEPROM.readFloat(0);
-  max_temp = EEPROM.readFloat(sizeof(float));
-  EEPROM.readBlock(2*sizeof(float),temp_history,SIZE_HISTORY);
-  curr_idx = EEPROM.readInt((2 + SIZE_HISTORY)*sizeof(float));
+  EEPROM.setMaxAllowedWrites(2048);
+  EEPROM.setMemPool(0,EEPROMSizeUno);
+  min_temp = EEPROM.readFloat(FLASH_OFFSET + 0);
+  max_temp = EEPROM.readFloat(FLASH_OFFSET + sizeof(float));
+  EEPROM.readBlock(FLASH_OFFSET + 2*sizeof(float),temp_history,SIZE_HISTORY);
+  curr_idx = EEPROM.readInt(FLASH_OFFSET + (2 + SIZE_HISTORY)*sizeof(float));
   const unsigned int offset = (3 + SIZE_HISTORY)*sizeof(float);
-  min_humidity = EEPROM.readByte(offset);
-  max_humidity = EEPROM.readByte(offset + 1);
-  EEPROM.readBlock(offset + 2,humidity_history,SIZE_HISTORY);
+  min_humidity = EEPROM.readByte(FLASH_OFFSET + offset);
+  max_humidity = EEPROM.readByte(FLASH_OFFSET + offset + 1);
+  EEPROM.readBlock(FLASH_OFFSET + offset + 2,humidity_history,SIZE_HISTORY*sizeof(unsigned char));
 
   calcMeanTemperature();
   Timer1.initialize(8800000);
